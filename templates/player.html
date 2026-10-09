@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Tour de Bytur</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="phone">
+  <main class="phone-main">
+    <h1>Tour de <span>Bytur</span></h1>
+
+    <form id="join-view" class="view" hidden>
+      <label for="name">Hvad hedder du?</label>
+      <input id="name" type="text" maxlength="14" autocomplete="off" placeholder="Dit navn">
+      <button class="btn btn-primary btn-big" type="submit">Join</button>
+    </form>
+
+    <section id="game-view" class="view" hidden>
+      <p id="me" class="me"></p>
+      <p id="info" class="info"></p>
+      <button id="roll-btn" class="btn btn-roll">Rul 🎲</button>
+      <p id="result" class="result"></p>
+    </section>
+
+    <p id="error" class="error"></p>
+  </main>
+
+  <script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='player.js') }}"></script>
+</body>
+</html>

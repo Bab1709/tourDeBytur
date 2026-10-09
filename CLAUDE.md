@@ -2,7 +2,18 @@
 
 ## About this project
 
-This project is a small website for tracking a personal stock portfolio, run locally on a Mac. It is built with Python and Flask, uses yfinance for prices, and stores the holdings in a local `portfolio.json` that is never committed.
+Tour de Bytur is a drinking board game with a night-out theme, inspired by property board games. It runs locally on a Mac: one shared host screen shows the board, and everyone plays from their phone on the same wifi by scanning a QR code. It is built with Python, Flask and Flask-SocketIO. The game text is in Danish; code and comments are in English.
+
+- `app.py` holds the Flask routes and Socket.IO events. The server owns the game state and sends the full state to every screen after each change.
+- `game/state.py` holds the rules as plain Python with no Flask, so they can be tested directly.
+- `data/board.json` and `data/settings.json` hold the bars, groups and numbers, so the game can be adapted without touching code.
+- `templates/` and `static/` hold the host screen (`/`) and the phone page (`/play`).
+
+## Commands
+
+- Install: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
+- Run: `.venv/bin/python app.py`, then open http://localhost:5001 (port 5000 is taken by AirPlay on macOS)
+- Test: `.venv/bin/pytest`
 
 ## Git workflow
 

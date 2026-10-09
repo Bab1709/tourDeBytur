@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tour de Bytur</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="host">
+  <main class="layout">
+    <section class="board-wrap">
+      <div id="board" class="board">
+        <div class="center">
+          <h1>Tour de <span>Bytur</span></h1>
+          <div id="dice" class="dice"></div>
+          <p id="status" class="status"></p>
+          <p id="roll-text" class="roll-text"></p>
+        </div>
+        <div id="pieces" class="pieces"></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="join-box">
+        <img src="{{ url_for('qr_code') }}" alt="QR-kode til at joine">
+        <div>
+          <h2>Join med telefonen</h2>
+          <p class="join-url">{{ join_url }}</p>
+        </div>
+      </div>
+
+      <h2>Spillere</h2>
+      <ul id="players" class="players"></ul>
+
+      <div class="host-buttons">
+        <button id="start-btn" class="btn btn-primary">Start spil</button>
+        <button id="skip-btn" class="btn" hidden>Spring tur over</button>
+        <button id="reset-btn" class="btn" hidden>Nyt spil</button>
+      </div>
+    </aside>
+  </main>
+
+  <script>const BOARD = {{ board|tojson }};</script>
+  <script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='host.js') }}"></script>
+</body>
+</html>
