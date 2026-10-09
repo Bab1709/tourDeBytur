@@ -18,6 +18,7 @@ const fieldEls = [];
 const pieces = {}; // player id -> { el, shown, slot, timer }
 let state = null;
 let seenRollSeq = 0;
+let animatedRollSeq = 0;
 
 function sipsText(count) {
   return count === 1 ? "1 tår" : `${count} tårer`;
@@ -91,6 +92,15 @@ function walkTo(piece, target) {
   }, STEP_MS);
 }
 
+function renderOwners() {
+  const colors = Object.fromEntries(state.players.map((p) => [p.id, p.color]));
+  fieldEls.forEach((el, index) => {
+    const color = colors[state.owners[index]];
+    el.classList.toggle("owned", Boolean(color));
+    el.style.setProperty("--owner", color || "transparent");
+  });
+}
+
 function renderPieces() {
   const roll = state.last_roll;
   const newRoll = roll && roll.seq !== seenRollSeq ? roll : null;
@@ -143,14 +153,16 @@ function renderCenter() {
   const roller = roll && state.players.find((p) => p.id === roll.player_id);
   if (roller) {
     diceEl.textContent = roll.value <= 6 ? String.fromCodePoint(0x267f + roll.value) : roll.value;
-    rollTextEl.textContent = `${roller.name} slog ${roll.value} og landede på ${roll.field}`;
   } else {
     diceEl.textContent = "🎲";
-    rollTextEl.textContent = "";
   }
-  diceEl.classList.remove("rolled");
-  void diceEl.offsetWidth; // restart the animation
-  if (roller) diceEl.classList.add("rolled");
+  rollTextEl.textContent = state.message;
+  if (roll && roll.seq !== animatedRollSeq) {
+    animatedRollSeq = roll.seq;
+    diceEl.classList.remove("rolled");
+    void diceEl.offsetWidth; // restart the animation
+    diceEl.classList.add("rolled");
+  }
 }
 
 function renderPlayers() {
@@ -175,6 +187,7 @@ function renderPlayers() {
 }
 
 function render() {
+  renderOwners();
   renderPieces();
   renderCenter();
   renderPlayers();

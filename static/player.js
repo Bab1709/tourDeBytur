@@ -7,13 +7,16 @@ const nameInput = document.getElementById("name");
 const meEl = document.getElementById("me");
 const infoEl = document.getElementById("info");
 const rollBtn = document.getElementById("roll-btn");
+const buyView = document.getElementById("buy-view");
+const buyBtn = document.getElementById("buy-btn");
+const declineBtn = document.getElementById("decline-btn");
 const resultEl = document.getElementById("result");
 const errorEl = document.getElementById("error");
 
 let token = loadToken();
 let myId = null;
 let state = null;
-let rolling = false;
+let busy = false; // waiting for the server to answer a button press
 
 // Storage can be blocked in private browsing; the game still works without it.
 function loadToken() {
@@ -44,16 +47,37 @@ function render() {
 
   const current = state.players.find((p) => p.id === state.current_player_id);
   const myTurn = state.started && current.id === myId;
+  const buying = state.pending && state.pending.type === "buy" && state.pending.player_id === myId;
   if (!state.started) infoEl.textContent = "Venter på at værten starter spillet…";
+  else if (buying) infoEl.textContent = "Baren er ledig. Vil du købe den?";
   else if (myTurn) infoEl.textContent = "Det er din tur!";
   else infoEl.textContent = `Det er ${current.name}s tur`;
 
-  rollBtn.disabled = !myTurn || rolling;
+  rollBtn.hidden = Boolean(buying);
+  rollBtn.disabled = !myTurn || busy;
   rollBtn.classList.toggle("ready", myTurn);
 
-  const roll = state.last_roll;
-  resultEl.textContent =
-    roll && roll.player_id === myId ? `Du slog ${roll.value} og landede på ${roll.field}` : "";
+  buyView.hidden = !buying;
+  buyBtn.disabled = declineBtn.disabled = busy;
+  if (buying) buyBtn.textContent = `Køb for ${sipsText(state.pending.price)} 🍺`;
+
+  resultEl.textContent = state.message;
+}
+
+function sipsText(count) {
+  return count === 1 ? "1 tår" : `${count} tårer`;
+}
+
+function send(event) {
+  busy = true;
+  errorEl.textContent = "";
+  render();
+  if (navigator.vibrate) navigator.vibrate(60);
+  socket.emit(event, { token }, (result) => {
+    busy = false;
+    if (!result.ok) errorEl.textContent = result.error;
+    render();
+  });
 }
 
 joinView.addEventListener("submit", (event) => {
@@ -70,20 +94,12 @@ joinView.addEventListener("submit", (event) => {
   });
 });
 
-rollBtn.addEventListener("click", () => {
-  rolling = true;
-  errorEl.textContent = "";
-  render();
-  if (navigator.vibrate) navigator.vibrate(60);
-  socket.emit("roll", { token }, (result) => {
-    rolling = false;
-    if (!result.ok) errorEl.textContent = result.error;
-    render();
-  });
-});
+rollBtn.addEventListener("click", () => send("roll"));
+buyBtn.addEventListener("click", () => send("buy"));
+declineBtn.addEventListener("click", () => send("decline"));
 
 socket.on("connect", () => {
-  rolling = false;
+  busy = false;
   if (!token) return;
   socket.emit("rejoin", { token }, (result) => {
     if (result.ok) {

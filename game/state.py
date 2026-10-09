@@ -24,6 +24,10 @@ class GameError(Exception):
     """A rule was broken. The message is shown to the players, so it is in Danish."""
 
 
+def sips_text(count):
+    return "1 tår" if count == 1 else f"{count} tårer"
+
+
 def load_board(path):
     board = json.loads(Path(path).read_text(encoding="utf-8"))
     validate_board(board)
@@ -39,8 +43,13 @@ def validate_board(board):
     for index, field in enumerate(fields):
         if field["type"] not in FIELD_TYPES:
             raise ValueError(f"Field {index} has unknown type {field['type']!r}")
-        if field["type"] == "bar" and field["group"] not in board["groups"]:
+        if field["type"] != "bar":
+            continue
+        if field["group"] not in board["groups"]:
             raise ValueError(f"Field {index} uses unknown group {field['group']!r}")
+        for key in ("price", "sips"):
+            if not isinstance(field.get(key), int) or field[key] < 0:
+                raise ValueError(f"Field {index} needs a whole number for {key!r}")
 
 
 @dataclass
@@ -50,6 +59,7 @@ class Player:
     name: str
     color: str
     position: int = 0
+    sips: int = 0  # sips taken so far
     connected: bool = True
 
     def to_dict(self):
@@ -58,6 +68,7 @@ class Player:
             "name": self.name,
             "color": self.color,
             "position": self.position,
+            "sips": self.sips,
             "connected": self.connected,
         }
 
@@ -72,6 +83,9 @@ class Game:
         self.started = False
         self.turn = 0
         self.last_roll = None
+        self.owners = {}  # field index -> player id
+        self.pending = None  # a choice the current player must make before the turn ends
+        self.message = ""
         self._next_id = 1
         self._roll_seq = 0
 
@@ -118,6 +132,8 @@ class Game:
             raise GameError("Ukendt spiller")
         if player is not self.current_player:
             raise GameError("Det er ikke din tur")
+        if self.pending:
+            raise GameError("Vælg først, om du vil købe baren")
         value = self.rng.randint(1, self.dice_sides)
         size = len(self.board["fields"])
         start = player.position
@@ -132,12 +148,39 @@ class Game:
             "passed_start": start + value >= size,
             "field": self.board["fields"][player.position]["name"],
         }
-        self._next_turn()
+        field = self.board["fields"][player.position]
+        self.message = f"{player.name} slog {value} og landede på {field['name']}"
+        if field["type"] == "bar" and player.position not in self.owners:
+            self.pending = {
+                "type": "buy",
+                "player_id": player.id,
+                "field": player.position,
+                "price": field["price"],
+            }
+        else:
+            self._next_turn()
         return self.last_roll
+
+    def buy(self, token):
+        player = self._pending_buyer(token)
+        field = self.board["fields"][self.pending["field"]]
+        self.owners[self.pending["field"]] = player.id
+        player.sips += field["price"]
+        self.message = f"{player.name} købte {field['name']} og drikker {sips_text(field['price'])}"
+        self.pending = None
+        self._next_turn()
+
+    def decline(self, token):
+        player = self._pending_buyer(token)
+        field = self.board["fields"][self.pending["field"]]
+        self.message = f"{player.name} købte ikke {field['name']}"
+        self.pending = None
+        self._next_turn()
 
     def skip_turn(self):
         if not self.started:
             raise GameError("Spillet er ikke startet endnu")
+        self.pending = None
         self._next_turn()
 
     def reset(self):
@@ -145,8 +188,20 @@ class Game:
         self.started = False
         self.turn = 0
         self.last_roll = None
+        self.owners = {}
+        self.pending = None
+        self.message = ""
         for player in self.players:
             player.position = 0
+            player.sips = 0
+
+    def _pending_buyer(self, token):
+        player = self.find_by_token(token)
+        if player is None:
+            raise GameError("Ukendt spiller")
+        if not self.pending or self.pending["player_id"] != player.id:
+            raise GameError("Du har ikke noget at købe lige nu")
+        return player
 
     def _next_turn(self):
         self.turn = (self.turn + 1) % len(self.players)
@@ -158,4 +213,7 @@ class Game:
             "players": [p.to_dict() for p in self.players],
             "current_player_id": current.id if current else None,
             "last_roll": self.last_roll,
+            "owners": {str(index): owner for index, owner in self.owners.items()},
+            "pending": self.pending,
+            "message": self.message,
         }

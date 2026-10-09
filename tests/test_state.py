@@ -82,16 +82,16 @@ def test_cannot_roll_before_start(board):
 
 
 def test_roll_moves_the_piece_and_passes_the_turn(board):
-    game = make_game(board, 4)
+    game = make_game(board, 3)
     anna = game.add_player("Anna")
     bo = game.add_player("Bo")
     game.start()
 
     roll = game.roll(anna.token)
 
-    assert anna.position == 4
-    assert roll["value"] == 4
-    assert roll["field"] == board["fields"][4]["name"]
+    assert anna.position == 3
+    assert roll["value"] == 3
+    assert roll["field"] == "Chance"
     assert roll["passed_start"] is False
     assert game.current_player is bo
 
@@ -121,7 +121,7 @@ def test_piece_wraps_around_the_ring(board):
 
 
 def test_turn_order_goes_around(board):
-    game = make_game(board, 1, 1, 1)
+    game = make_game(board, 3, 3)
     anna = game.add_player("Anna")
     bo = game.add_player("Bo")
     game.start()
@@ -151,6 +151,107 @@ def test_reset_keeps_players_and_moves_them_to_start(board):
     assert game.players == [anna]
     assert anna.position == 0
     assert game.to_dict()["last_roll"] is None
+
+
+def test_board_rejects_bar_without_price(board):
+    del board["fields"][1]["price"]
+    with pytest.raises(ValueError):
+        validate_board(board)
+
+
+def two_player_game(board, *rolls):
+    game = make_game(board, *rolls)
+    anna = game.add_player("Anna")
+    bo = game.add_player("Bo")
+    game.start()
+    return game, anna, bo
+
+
+def test_landing_on_a_free_bar_offers_it_and_holds_the_turn(board):
+    game, anna, bo = two_player_game(board, 4)
+
+    game.roll(anna.token)
+
+    assert game.pending == {"type": "buy", "player_id": anna.id, "field": 4, "price": 2}
+    assert game.current_player is anna
+    with pytest.raises(GameError):
+        game.roll(anna.token)
+
+
+def test_buying_a_bar_costs_sips_and_ends_the_turn(board):
+    game, anna, bo = two_player_game(board, 4)
+    game.roll(anna.token)
+
+    game.buy(anna.token)
+
+    assert game.owners == {4: anna.id}
+    assert anna.sips == 2
+    assert game.pending is None
+    assert game.current_player is bo
+    assert game.to_dict()["owners"] == {"4": anna.id}
+
+
+def test_declining_leaves_the_bar_free(board):
+    game, anna, bo = two_player_game(board, 4)
+    game.roll(anna.token)
+
+    game.decline(anna.token)
+
+    assert game.owners == {}
+    assert anna.sips == 0
+    assert game.current_player is bo
+
+
+def test_only_the_player_on_the_bar_can_buy_it(board):
+    game, anna, bo = two_player_game(board, 4)
+    game.roll(anna.token)
+    with pytest.raises(GameError):
+        game.buy(bo.token)
+    with pytest.raises(GameError):
+        game.decline(bo.token)
+    assert game.owners == {}
+
+
+def test_cannot_buy_without_an_offer(board):
+    game, anna, bo = two_player_game(board, 3)
+    with pytest.raises(GameError):
+        game.buy(anna.token)
+    game.roll(anna.token)  # a chance field
+    with pytest.raises(GameError):
+        game.buy(anna.token)
+
+
+def test_an_owned_bar_is_not_offered_again(board):
+    game, anna, bo = two_player_game(board, 4, 4)
+    game.roll(anna.token)
+    game.buy(anna.token)
+
+    game.roll(bo.token)
+
+    assert game.pending is None
+    assert game.owners == {4: anna.id}
+    assert game.current_player is anna
+
+
+def test_skip_turn_cancels_an_open_offer(board):
+    game, anna, bo = two_player_game(board, 4)
+    game.roll(anna.token)
+
+    game.skip_turn()
+
+    assert game.pending is None
+    assert game.current_player is bo
+
+
+def test_reset_clears_owners_and_sips(board):
+    game, anna, bo = two_player_game(board, 4)
+    game.roll(anna.token)
+    game.buy(anna.token)
+
+    game.reset()
+
+    assert game.owners == {}
+    assert anna.sips == 0
 
 
 def test_state_never_contains_tokens(board):

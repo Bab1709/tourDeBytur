@@ -43,6 +43,23 @@ def test_join_start_and_roll_updates_every_screen():
     assert state["players"][0]["position"] == state["last_roll"]["to"] > 0
 
 
+def test_buying_a_bar_from_the_phone(monkeypatch):
+    monkeypatch.setattr(server.game.rng, "randint", lambda low, high: 4)
+    host = connect()
+    phone = connect()
+    token = phone.emit("join", {"name": "Anna"}, callback=True)["token"]
+    host.emit("start", callback=True)
+    phone.emit("roll", {"token": token}, callback=True)
+    assert last_state(host)["pending"]["type"] == "buy"
+
+    assert phone.emit("buy", {"token": token}, callback=True)["ok"]
+
+    state = last_state(host)
+    assert state["owners"] == {"4": state["players"][0]["id"]}
+    assert state["players"][0]["sips"] == 2
+    assert state["pending"] is None
+
+
 def test_join_with_taken_name_is_refused():
     connect().emit("join", {"name": "Anna"}, callback=True)
     result = connect().emit("join", {"name": "Anna"}, callback=True)

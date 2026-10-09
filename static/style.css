@@ -102,6 +102,11 @@ h2 {
   box-shadow: inset 0 0 0 0.2vmin rgba(255, 255, 255, 0.12);
 }
 
+.field.owned {
+  background: color-mix(in srgb, var(--owner) 45%, var(--field));
+  box-shadow: inset 0 0 0 0.6vmin var(--owner), 0 0 1.6vmin var(--owner);
+}
+
 .field .band {
   align-self: stretch;
   flex: none;
@@ -362,6 +367,27 @@ h2 {
 }
 
 .btn-roll.ready {
+  background: var(--me);
+  color: #140a2e;
+  box-shadow: 0 0 2rem var(--me);
+}
+
+.buy-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.btn-choice {
+  flex: 1;
+  min-height: 6.5rem;
+  border-radius: 1.5rem;
+  font-size: 2rem;
+}
+
+.btn-buy {
+  flex: 2;
   background: var(--me);
   color: #140a2e;
   box-shadow: 0 0 2rem var(--me);
