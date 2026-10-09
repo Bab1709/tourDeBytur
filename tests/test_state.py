@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from game.state import Game, GameError, load_board, validate_board
+from game.state import Game, GameError, load_board, load_cards, validate_board
 
-BOARD_PATH = Path(__file__).parent.parent / "data" / "board.json"
+DATA_DIR = Path(__file__).parent.parent / "data"
+BOARD_PATH = DATA_DIR / "board.json"
 
 
 class FixedDice:
@@ -15,6 +16,9 @@ class FixedDice:
 
     def randint(self, low, high):
         return self.values.pop(0)
+
+    def shuffle(self, items):
+        pass
 
 
 @pytest.fixture
@@ -389,6 +393,80 @@ def test_skip_turn_drops_all_waiting_choices(board):
     assert game.pending is None
     assert game.current_player is bo
     assert bo.sips == 0
+
+
+CARDS = [{"text": "Kort A"}, {"text": "Kort B"}]
+
+
+def card_game(board, *rolls):
+    game = Game(board, CARDS, rng=FixedDice(*rolls))
+    anna = game.add_player("Anna")
+    bo = game.add_player("Bo")
+    game.start()
+    return game, anna, bo
+
+
+def test_chance_file_has_cards():
+    cards = load_cards(DATA_DIR / "chance.json")
+    assert len(cards) >= 10
+
+
+def test_chance_card_needs_text(tmp_path):
+    path = tmp_path / "chance.json"
+    path.write_text('{"cards": [{"text": "  "}]}', encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_cards(path)
+
+
+def test_chance_field_draws_a_card_and_holds_the_turn(board):
+    game, anna, bo = card_game(board, 3)
+
+    game.roll(anna.token)
+
+    assert game.pending == {"type": "card", "player_id": anna.id, "text": "Kort B"}
+    assert "Kort B" in game.message
+    assert game.current_player is anna
+    with pytest.raises(GameError):
+        game.roll(anna.token)
+
+
+def test_finishing_the_card_ends_the_turn(board):
+    game, anna, bo = card_game(board, 3)
+    game.roll(anna.token)
+    with pytest.raises(GameError):
+        game.finish_card(bo.token)
+
+    game.finish_card(anna.token)
+
+    assert game.pending is None
+    assert game.current_player is bo
+
+
+def test_every_card_comes_up_before_any_repeats(board):
+    game, anna, bo = card_game(board, 3, 3, 6, 6)
+    drawn = []
+    for player in (anna, bo, anna, bo):
+        game.roll(player.token)
+        drawn.append(game.pending["text"])
+        game.finish_card(player.token)
+    assert sorted(drawn[:2]) == ["Kort A", "Kort B"]
+    assert sorted(drawn[2:]) == ["Kort A", "Kort B"]
+
+
+def test_passing_start_onto_chance_gives_sips_before_the_card(board):
+    game, anna, bo = card_game(board, 5)
+    anna.position = 22
+    game.roll(anna.token)
+    assert game.pending["type"] == "give"
+    game.give(anna.token, bo.id)
+    assert game.pending["type"] == "card"
+
+
+def test_chance_does_nothing_without_cards(board):
+    game, anna, bo = two_player_game(board, 3)
+    game.roll(anna.token)
+    assert game.pending is None
+    assert game.current_player is bo
 
 
 def test_state_never_contains_tokens(board):

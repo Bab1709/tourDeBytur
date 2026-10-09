@@ -11,7 +11,7 @@ import qrcode.image.svg
 from flask import Flask, Response, render_template, request
 from flask_socketio import SocketIO
 
-from game.state import Game, GameError, load_board
+from game.state import Game, GameError, load_board, load_cards
 
 DATA_DIR = Path(__file__).parent / "data"
 PORT = 5001  # macOS uses port 5000 for AirPlay
@@ -21,7 +21,8 @@ socketio = SocketIO(app, async_mode="threading")
 
 board = load_board(DATA_DIR / "board.json")
 settings = json.loads((DATA_DIR / "settings.json").read_text(encoding="utf-8"))
-game = Game(board, **settings)
+cards = load_cards(DATA_DIR / "chance.json")
+game = Game(board, cards, **settings)
 lock = threading.Lock()
 connections = {}  # socket id -> player token
 
@@ -137,6 +138,11 @@ def on_decline(data):
 @socketio.on("give")
 def on_give(data):
     return run_action(game.give, (data or {}).get("token"), (data or {}).get("target"))
+
+
+@socketio.on("finish_card")
+def on_finish_card(data):
+    return run_action(game.finish_card, (data or {}).get("token"))
 
 
 @socketio.on("start")
