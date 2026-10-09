@@ -10,6 +10,7 @@ const rollBtn = document.getElementById("roll-btn");
 const buyView = document.getElementById("buy-view");
 const buyBtn = document.getElementById("buy-btn");
 const declineBtn = document.getElementById("decline-btn");
+const giveView = document.getElementById("give-view");
 const resultEl = document.getElementById("result");
 const errorEl = document.getElementById("error");
 
@@ -43,23 +44,41 @@ function render() {
   if (!me) return;
 
   document.body.style.setProperty("--me", me.color);
-  meEl.textContent = me.name;
+  meEl.textContent = `${me.name} · 🍺 ${me.sips}`;
 
   const current = state.players.find((p) => p.id === state.current_player_id);
   const myTurn = state.started && current.id === myId;
-  const buying = state.pending && state.pending.type === "buy" && state.pending.player_id === myId;
+  const choice = state.pending && state.pending.player_id === myId ? state.pending : null;
+  const buying = choice && choice.type === "buy";
+  const giving = choice && choice.type === "give";
   if (!state.started) infoEl.textContent = "Venter på at værten starter spillet…";
   else if (buying) infoEl.textContent = "Baren er ledig. Vil du købe den?";
+  else if (giving) infoEl.textContent = `Du passerede start! Hvem skal have ${sipsText(choice.sips)}?`;
   else if (myTurn) infoEl.textContent = "Det er din tur!";
   else infoEl.textContent = `Det er ${current.name}s tur`;
 
-  rollBtn.hidden = Boolean(buying);
+  rollBtn.hidden = Boolean(choice);
   rollBtn.disabled = !myTurn || busy;
   rollBtn.classList.toggle("ready", myTurn);
 
   buyView.hidden = !buying;
   buyBtn.disabled = declineBtn.disabled = busy;
   if (buying) buyBtn.textContent = `Køb for ${sipsText(state.pending.price)} 🍺`;
+
+  giveView.hidden = !giving;
+  giveView.replaceChildren();
+  if (giving) {
+    for (const player of state.players) {
+      if (player.id === myId) continue;
+      const button = document.createElement("button");
+      button.className = "btn btn-give";
+      button.textContent = player.name;
+      button.style.background = player.color;
+      button.disabled = busy;
+      button.addEventListener("click", () => send("give", { target: player.id }));
+      giveView.append(button);
+    }
+  }
 
   resultEl.textContent = state.message;
 }
@@ -68,12 +87,12 @@ function sipsText(count) {
   return count === 1 ? "1 tår" : `${count} tårer`;
 }
 
-function send(event) {
+function send(event, extra = {}) {
   busy = true;
   errorEl.textContent = "";
   render();
   if (navigator.vibrate) navigator.vibrate(60);
-  socket.emit(event, { token }, (result) => {
+  socket.emit(event, { token, ...extra }, (result) => {
     busy = false;
     if (!result.ok) errorEl.textContent = result.error;
     render();

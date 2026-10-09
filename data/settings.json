@@ -1,4 +1,6 @@
 {
   "dice_sides": 6,
-  "max_players": 8
+  "max_players": 8,
+  "pass_start_sips": 2,
+  "group_multiplier": 2
 }

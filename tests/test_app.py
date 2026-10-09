@@ -60,6 +60,23 @@ def test_buying_a_bar_from_the_phone(monkeypatch):
     assert state["pending"] is None
 
 
+def test_giving_sips_from_the_phone(monkeypatch):
+    monkeypatch.setattr(server.game.rng, "randint", lambda low, high: 3)
+    anna_phone = connect()
+    bo_phone = connect()
+    anna = anna_phone.emit("join", {"name": "Anna"}, callback=True)
+    bo = bo_phone.emit("join", {"name": "Bo"}, callback=True)
+    anna_phone.emit("start", callback=True)
+    server.game.players[0].position = 22
+    anna_phone.emit("roll", {"token": anna["token"]}, callback=True)
+    assert last_state(bo_phone)["pending"]["type"] == "give"
+
+    result = anna_phone.emit("give", {"token": anna["token"], "target": bo["id"]}, callback=True)
+
+    assert result["ok"]
+    assert last_state(bo_phone)["players"][1]["sips"] == 2
+
+
 def test_join_with_taken_name_is_refused():
     connect().emit("join", {"name": "Anna"}, callback=True)
     result = connect().emit("join", {"name": "Anna"}, callback=True)

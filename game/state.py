@@ -60,6 +60,7 @@ class Player:
     color: str
     position: int = 0
     sips: int = 0  # sips taken so far
+    skip_next: bool = False
     connected: bool = True
 
     def to_dict(self):
@@ -69,15 +70,26 @@ class Player:
             "color": self.color,
             "position": self.position,
             "sips": self.sips,
+            "skip_next": self.skip_next,
             "connected": self.connected,
         }
 
 
 class Game:
-    def __init__(self, board, dice_sides=6, max_players=8, rng=None):
+    def __init__(
+        self,
+        board,
+        dice_sides=6,
+        max_players=8,
+        pass_start_sips=2,
+        group_multiplier=2,
+        rng=None,
+    ):
         self.board = board
         self.dice_sides = dice_sides
         self.max_players = min(max_players, len(PLAYER_COLORS))
+        self.pass_start_sips = pass_start_sips
+        self.group_multiplier = group_multiplier
         self.rng = rng or random.Random()
         self.players = []
         self.started = False
@@ -85,7 +97,8 @@ class Game:
         self.last_roll = None
         self.owners = {}  # field index -> player id
         self.pending = None  # a choice the current player must make before the turn ends
-        self.message = ""
+        self._queue = []  # further choices waiting behind the pending one
+        self._events = []  # what has happened in the current turn, shown on every screen
         self._next_id = 1
         self._roll_seq = 0
 
@@ -95,9 +108,19 @@ class Game:
             return None
         return self.players[self.turn]
 
+    @property
+    def message(self):
+        return "\n".join(self._events)
+
     def find_by_token(self, token):
         for player in self.players:
             if player.token == token:
+                return player
+        return None
+
+    def find_by_id(self, player_id):
+        for player in self.players:
+            if player.id == player_id:
                 return player
         return None
 
@@ -133,11 +156,12 @@ class Game:
         if player is not self.current_player:
             raise GameError("Det er ikke din tur")
         if self.pending:
-            raise GameError("Vælg først, om du vil købe baren")
+            raise GameError("Du skal vælge, før du kan rulle igen")
         value = self.rng.randint(1, self.dice_sides)
         size = len(self.board["fields"])
         start = player.position
         player.position = (start + value) % size
+        field = self.board["fields"][player.position]
         self._roll_seq += 1
         self.last_roll = {
             "seq": self._roll_seq,
@@ -146,42 +170,65 @@ class Game:
             "from": start,
             "to": player.position,
             "passed_start": start + value >= size,
-            "field": self.board["fields"][player.position]["name"],
+            "field": field["name"],
         }
-        field = self.board["fields"][player.position]
-        self.message = f"{player.name} slog {value} og landede på {field['name']}"
-        if field["type"] == "bar" and player.position not in self.owners:
-            self.pending = {
-                "type": "buy",
-                "player_id": player.id,
-                "field": player.position,
-                "price": field["price"],
-            }
-        else:
-            self._next_turn()
+        self._events = [f"{player.name} slog {value} og landede på {field['name']}"]
+        self._queue = []
+        if self.last_roll["passed_start"] and self.pass_start_sips > 0 and len(self.players) > 1:
+            self._queue.append(
+                {"type": "give", "player_id": player.id, "sips": self.pass_start_sips}
+            )
+        self._land(player, field)
+        self._advance()
         return self.last_roll
 
+    def rent(self, index):
+        """Sips for landing on an owned bar, multiplied if the owner has the whole group."""
+        field = self.board["fields"][index]
+        owner = self.owners[index]
+        group = [
+            i
+            for i, other in enumerate(self.board["fields"])
+            if other["type"] == "bar" and other["group"] == field["group"]
+        ]
+        if all(self.owners.get(i) == owner for i in group):
+            return field["sips"] * self.group_multiplier
+        return field["sips"]
+
     def buy(self, token):
-        player = self._pending_buyer(token)
+        player = self._chooser(token, "buy")
         field = self.board["fields"][self.pending["field"]]
         self.owners[self.pending["field"]] = player.id
         player.sips += field["price"]
-        self.message = f"{player.name} købte {field['name']} og drikker {sips_text(field['price'])}"
-        self.pending = None
-        self._next_turn()
+        self._events.append(
+            f"{player.name} købte {field['name']} og drikker {sips_text(field['price'])}"
+        )
+        self._advance()
 
     def decline(self, token):
-        player = self._pending_buyer(token)
+        player = self._chooser(token, "buy")
         field = self.board["fields"][self.pending["field"]]
-        self.message = f"{player.name} købte ikke {field['name']}"
-        self.pending = None
-        self._next_turn()
+        self._events.append(f"{player.name} købte ikke {field['name']}")
+        self._advance()
+
+    def give(self, token, target_id):
+        """Hand out the sips earned by passing start to another player."""
+        player = self._chooser(token, "give")
+        target = self.find_by_id(target_id)
+        if target is None or target is player:
+            raise GameError("Vælg en anden spiller")
+        target.sips += self.pending["sips"]
+        self._events.append(
+            f"{player.name} passerede start og gav {sips_text(self.pending['sips'])} til {target.name}"
+        )
+        self._advance()
 
     def skip_turn(self):
         if not self.started:
             raise GameError("Spillet er ikke startet endnu")
-        self.pending = None
-        self._next_turn()
+        self._events = [f"{self.current_player.name}s tur blev sprunget over"]
+        self._queue = []
+        self._advance()
 
     def reset(self):
         """Back to the lobby. The players stay, so nobody has to join again."""
@@ -190,21 +237,63 @@ class Game:
         self.last_roll = None
         self.owners = {}
         self.pending = None
-        self.message = ""
+        self._queue = []
+        self._events = []
         for player in self.players:
             player.position = 0
             player.sips = 0
+            player.skip_next = False
 
-    def _pending_buyer(self, token):
+    def _land(self, player, field):
+        if field["type"] == "brandert":
+            player.skip_next = True
+            self._events.append(
+                f"{player.name} drikker et glas vand og springer næste tur over"
+            )
+        elif field["type"] == "bar":
+            owner = self.find_by_id(self.owners.get(player.position))
+            if owner is None:
+                self._queue.append(
+                    {
+                        "type": "buy",
+                        "player_id": player.id,
+                        "field": player.position,
+                        "price": field["price"],
+                    }
+                )
+            elif owner is not player:
+                sips = self.rent(player.position)
+                player.sips += sips
+                doubled = " – hele farvegruppen!" if sips != field["sips"] else ""
+                self._events.append(
+                    f"{player.name} drikker {sips_text(sips)} hos {owner.name}{doubled}"
+                )
+
+    def _chooser(self, token, kind):
         player = self.find_by_token(token)
         if player is None:
             raise GameError("Ukendt spiller")
-        if not self.pending or self.pending["player_id"] != player.id:
-            raise GameError("Du har ikke noget at købe lige nu")
+        pending = self.pending
+        if not pending or pending["type"] != kind or pending["player_id"] != player.id:
+            raise GameError("Det kan du ikke lige nu")
         return player
 
+    def _advance(self):
+        """Move on to the next waiting choice, or end the turn if there is none."""
+        if self._queue:
+            self.pending = self._queue.pop(0)
+        else:
+            self.pending = None
+            self._next_turn()
+
     def _next_turn(self):
-        self.turn = (self.turn + 1) % len(self.players)
+        for _ in self.players:
+            self.turn = (self.turn + 1) % len(self.players)
+            player = self.players[self.turn]
+            if not player.skip_next:
+                return
+            player.skip_next = False
+            self._events.append(f"{player.name} står over efter Brandert-hjørnet")
 
     def to_dict(self):
         current = self.current_player
@@ -214,6 +303,7 @@ class Game:
             "current_player_id": current.id if current else None,
             "last_roll": self.last_roll,
             "owners": {str(index): owner for index, owner in self.owners.items()},
+            "rents": {str(index): self.rent(index) for index in self.owners},
             "pending": self.pending,
             "message": self.message,
         }
