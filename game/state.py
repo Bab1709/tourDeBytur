@@ -34,6 +34,14 @@ def load_board(path):
     return board
 
 
+def load_cards(path):
+    cards = json.loads(Path(path).read_text(encoding="utf-8"))["cards"]
+    for index, card in enumerate(cards):
+        if not isinstance(card.get("text"), str) or not card["text"].strip():
+            raise ValueError(f"Chance card {index} needs a text")
+    return cards
+
+
 def validate_board(board):
     fields = board["fields"]
     if len(fields) < 8 or len(fields) % 4 != 0:
@@ -79,6 +87,7 @@ class Game:
     def __init__(
         self,
         board,
+        cards=(),
         dice_sides=6,
         max_players=8,
         pass_start_sips=2,
@@ -86,6 +95,8 @@ class Game:
         rng=None,
     ):
         self.board = board
+        self.cards = list(cards)
+        self._deck = []  # shuffled cards not drawn yet
         self.dice_sides = dice_sides
         self.max_players = min(max_players, len(PLAYER_COLORS))
         self.pass_start_sips = pass_start_sips
@@ -223,6 +234,11 @@ class Game:
         )
         self._advance()
 
+    def finish_card(self, token):
+        """The player has done what the chance card said."""
+        self._chooser(token, "card")
+        self._advance()
+
     def skip_turn(self):
         if not self.started:
             raise GameError("Spillet er ikke startet endnu")
@@ -239,6 +255,7 @@ class Game:
         self.pending = None
         self._queue = []
         self._events = []
+        self._deck = []
         for player in self.players:
             player.position = 0
             player.sips = 0
@@ -250,6 +267,10 @@ class Game:
             self._events.append(
                 f"{player.name} drikker et glas vand og springer næste tur over"
             )
+        elif field["type"] == "chance" and self.cards:
+            text = self._draw_card()
+            self._events.append(f"{player.name} trak et chance-kort: {text}")
+            self._queue.append({"type": "card", "player_id": player.id, "text": text})
         elif field["type"] == "bar":
             owner = self.find_by_id(self.owners.get(player.position))
             if owner is None:
@@ -268,6 +289,13 @@ class Game:
                 self._events.append(
                     f"{player.name} drikker {sips_text(sips)} hos {owner.name}{doubled}"
                 )
+
+    def _draw_card(self):
+        """Every card comes up once before the deck is shuffled again."""
+        if not self._deck:
+            self._deck = list(self.cards)
+            self.rng.shuffle(self._deck)
+        return self._deck.pop()["text"]
 
     def _chooser(self, token, kind):
         player = self.find_by_token(token)

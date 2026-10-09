@@ -77,6 +77,23 @@ def test_giving_sips_from_the_phone(monkeypatch):
     assert last_state(bo_phone)["players"][1]["sips"] == 2
 
 
+def test_chance_card_reaches_every_screen(monkeypatch):
+    monkeypatch.setattr(server, "game", Game(server.board, server.cards))
+    monkeypatch.setattr(server.game.rng, "randint", lambda low, high: 3)
+    host = connect()
+    phone = connect()
+    token = phone.emit("join", {"name": "Anna"}, callback=True)["token"]
+    host.emit("start", callback=True)
+
+    phone.emit("roll", {"token": token}, callback=True)
+
+    pending = last_state(host)["pending"]
+    assert pending["type"] == "card"
+    assert pending["text"] in [card["text"] for card in server.cards]
+    assert phone.emit("finish_card", {"token": token}, callback=True)["ok"]
+    assert last_state(host)["pending"] is None
+
+
 def test_join_with_taken_name_is_refused():
     connect().emit("join", {"name": "Anna"}, callback=True)
     result = connect().emit("join", {"name": "Anna"}, callback=True)

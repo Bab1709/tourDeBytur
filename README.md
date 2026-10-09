@@ -14,6 +14,6 @@ python3 -m venv .venv
 
 ## Tilpas spillet
 
-Barer, farvegrupper og antal tårer ligger i `data/board.json`. Brættet er en ring, så antallet af felter skal kunne deles med 4, og første felt skal være start.
+Barer, farvegrupper og antal tårer ligger i `data/board.json`. Chance-kortene ligger i `data/chance.json`, hvor hvert kort er en tekst. Brættet er en ring, så antallet af felter skal kunne deles med 4, og første felt skal være start.
 
 Tallene for reglerne ligger i `data/settings.json`: `pass_start_sips` er antal tårer, man må uddele, når man passerer start, og `group_multiplier` er, hvor meget tårerne ganges med, når én spiller ejer hele farvegruppen.

@@ -6,7 +6,7 @@ Tour de Bytur is a drinking board game with a night-out theme, inspired by prope
 
 - `app.py` holds the Flask routes and Socket.IO events. The server owns the game state and sends the full state to every screen after each change.
 - `game/state.py` holds the rules as plain Python with no Flask, so they can be tested directly.
-- `data/board.json` and `data/settings.json` hold the bars, groups and numbers, so the game can be adapted without touching code.
+- `data/board.json`, `data/chance.json` and `data/settings.json` hold the bars, groups, chance cards and numbers, so the game can be adapted without touching code.
 - `templates/` and `static/` hold the host screen (`/`) and the phone page (`/play`).
 
 ## Commands

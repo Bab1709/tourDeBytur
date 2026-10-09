@@ -10,6 +10,9 @@ const diceEl = document.getElementById("dice");
 const statusEl = document.getElementById("status");
 const rollTextEl = document.getElementById("roll-text");
 const playersEl = document.getElementById("players");
+const cardEl = document.getElementById("card");
+const cardTextEl = document.getElementById("card-text");
+const cardPlayerEl = document.getElementById("card-player");
 const startBtn = document.getElementById("start-btn");
 const skipBtn = document.getElementById("skip-btn");
 const resetBtn = document.getElementById("reset-btn");
@@ -145,7 +148,7 @@ function renderPieces() {
 // Tells the room what the game is waiting for while a player chooses on their phone.
 function pendingText() {
   const pending = state.pending;
-  if (!pending) return "";
+  if (!pending || pending.type === "card") return "";
   const name = state.players.find((p) => p.id === pending.player_id).name;
   if (pending.type === "buy") {
     return `${name} kan købe ${fields[pending.field].name} for ${sipsText(pending.price)}…`;
@@ -179,6 +182,17 @@ function renderCenter() {
     void diceEl.offsetWidth; // restart the animation
     diceEl.classList.add("rolled");
   }
+}
+
+function renderCard() {
+  const pending = state.pending;
+  const showing = Boolean(pending && pending.type === "card");
+  cardEl.hidden = !showing;
+  if (!showing) return;
+  const player = state.players.find((p) => p.id === pending.player_id);
+  cardTextEl.textContent = pending.text;
+  cardPlayerEl.textContent = `${player.name} trykker Færdig på telefonen`;
+  cardEl.style.setProperty("--owner", player.color);
 }
 
 function renderPlayers() {
@@ -225,6 +239,7 @@ function render() {
   renderOwners();
   renderPieces();
   renderCenter();
+  renderCard();
   renderPlayers();
   startBtn.hidden = state.started;
   startBtn.disabled = state.players.length === 0;

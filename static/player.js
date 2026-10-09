@@ -11,6 +11,9 @@ const buyView = document.getElementById("buy-view");
 const buyBtn = document.getElementById("buy-btn");
 const declineBtn = document.getElementById("decline-btn");
 const giveView = document.getElementById("give-view");
+const cardView = document.getElementById("card-view");
+const cardText = document.getElementById("card-text");
+const doneBtn = document.getElementById("done-btn");
 const resultEl = document.getElementById("result");
 const errorEl = document.getElementById("error");
 
@@ -51,9 +54,11 @@ function render() {
   const choice = state.pending && state.pending.player_id === myId ? state.pending : null;
   const buying = choice && choice.type === "buy";
   const giving = choice && choice.type === "give";
+  const card = choice && choice.type === "card";
   if (!state.started) infoEl.textContent = "Venter på at værten starter spillet…";
   else if (buying) infoEl.textContent = "Baren er ledig. Vil du købe den?";
   else if (giving) infoEl.textContent = `Du passerede start! Hvem skal have ${sipsText(choice.sips)}?`;
+  else if (card) infoEl.textContent = "Chance! Læs kortet højt";
   else if (myTurn) infoEl.textContent = "Det er din tur!";
   else infoEl.textContent = `Det er ${current.name}s tur`;
 
@@ -80,7 +85,12 @@ function render() {
     }
   }
 
-  resultEl.textContent = state.message;
+  cardView.hidden = !card;
+  doneBtn.disabled = busy;
+  if (card) cardText.textContent = choice.text;
+
+  // The card itself is on screen, so the message would only repeat it.
+  resultEl.textContent = card ? "" : state.message;
 }
 
 function sipsText(count) {
@@ -116,6 +126,7 @@ joinView.addEventListener("submit", (event) => {
 rollBtn.addEventListener("click", () => send("roll"));
 buyBtn.addEventListener("click", () => send("buy"));
 declineBtn.addEventListener("click", () => send("decline"));
+doneBtn.addEventListener("click", () => send("finish_card"));
 
 socket.on("connect", () => {
   busy = false;
