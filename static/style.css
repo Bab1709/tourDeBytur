@@ -393,6 +393,10 @@ h2 {
   font-size: 2.2vmin;
 }
 
+.host-buttons .btn-icon {
+  flex: none;
+}
+
 /* ---------- Phone ---------- */
 
 .phone {
@@ -432,6 +436,28 @@ h2 {
   font: inherit;
   font-size: 1.6rem;
   text-align: center;
+}
+
+.drink-picker {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.btn-drink {
+  flex: 1;
+  padding: 0.9rem 0.2rem;
+  border-radius: 0.8rem;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.btn-drink.selected {
+  background: var(--gold);
+  color: #140a2e;
+}
+
+.drink-picker-small .btn-drink {
+  padding: 0.6rem 0.2rem;
 }
 
 .btn-big {

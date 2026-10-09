@@ -94,6 +94,19 @@ def test_chance_card_reaches_every_screen(monkeypatch):
     assert last_state(host)["pending"] is None
 
 
+def test_choosing_and_switching_drink_from_the_phone():
+    host = connect()
+    phone = connect()
+    joined = phone.emit("join", {"name": "Anna", "drink": "vand"}, callback=True)
+    assert last_state(host)["players"][0]["drink"] == "vand"
+
+    result = phone.emit("set_drink", {"token": joined["token"], "drink": "sodavand"}, callback=True)
+
+    assert result["ok"]
+    assert last_state(host)["players"][0]["drink"] == "sodavand"
+    assert b'data-default-drink="alkohol"' in server.app.test_client().get("/play").data
+
+
 def test_join_with_taken_name_is_refused():
     connect().emit("join", {"name": "Anna"}, callback=True)
     result = connect().emit("join", {"name": "Anna"}, callback=True)

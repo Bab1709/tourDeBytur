@@ -18,6 +18,7 @@ PLAYER_COLORS = [
 ]
 MAX_NAME_LENGTH = 14
 FIELD_TYPES = {"start", "bar", "chance", "brandert"}
+DRINKS = ("alkohol", "sodavand", "vand")
 
 
 class GameError(Exception):
@@ -66,6 +67,7 @@ class Player:
     token: str  # secret, only known by the player's own phone
     name: str
     color: str
+    drink: str = DRINKS[0]
     position: int = 0
     sips: int = 0  # sips taken so far
     skip_next: bool = False
@@ -76,6 +78,7 @@ class Player:
             "id": self.id,
             "name": self.name,
             "color": self.color,
+            "drink": self.drink,
             "position": self.position,
             "sips": self.sips,
             "skip_next": self.skip_next,
@@ -92,8 +95,12 @@ class Game:
         max_players=8,
         pass_start_sips=2,
         group_multiplier=2,
+        default_drink=DRINKS[0],
         rng=None,
     ):
+        if default_drink not in DRINKS:
+            raise ValueError(f"default_drink must be one of {DRINKS}")
+        self.default_drink = default_drink
         self.board = board
         self.cards = list(cards)
         self._deck = []  # shuffled cards not drawn yet
@@ -135,7 +142,7 @@ class Game:
                 return player
         return None
 
-    def add_player(self, name):
+    def add_player(self, name, drink=None):
         name = " ".join(str(name).split())[:MAX_NAME_LENGTH]
         if not name:
             raise GameError("Skriv et navn")
@@ -143,12 +150,20 @@ class Game:
             raise GameError("Det navn er allerede taget")
         if len(self.players) >= self.max_players:
             raise GameError("Spillet er fyldt op")
+        drink = self._valid_drink(drink or self.default_drink)
         used = {p.color for p in self.players}
         color = next(c for c in PLAYER_COLORS if c not in used)
-        player = Player(self._next_id, secrets.token_urlsafe(16), name, color)
+        player = Player(self._next_id, secrets.token_urlsafe(16), name, color, drink)
         self._next_id += 1
         self.players.append(player)
         return player
+
+    def set_drink(self, token, drink):
+        """A player can switch between alcohol, soda and water at any time."""
+        player = self.find_by_token(token)
+        if player is None:
+            raise GameError("Ukendt spiller")
+        player.drink = self._valid_drink(drink)
 
     def start(self):
         if self.started:
@@ -289,6 +304,12 @@ class Game:
                 self._events.append(
                     f"{player.name} drikker {sips_text(sips)} hos {owner.name}{doubled}"
                 )
+
+    @staticmethod
+    def _valid_drink(drink):
+        if drink not in DRINKS:
+            raise GameError("Vælg alkohol, sodavand eller vand")
+        return drink
 
     def _draw_card(self):
         """Every card comes up once before the deck is shuffled again."""

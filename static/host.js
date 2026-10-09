@@ -1,4 +1,11 @@
 const STEP_MS = 280;
+const DRINK_ICONS = { alkohol: "🍺", sodavand: "🥤", vand: "💧" };
+const MUTE_KEY = "tourDeByturMuted";
+// Each note is [frequency in Hz, start in seconds, length in seconds].
+const SOUNDS = {
+  roll: [[220, 0, 0.06], [330, 0.08, 0.06], [262, 0.16, 0.06], [392, 0.24, 0.06], [523, 0.34, 0.2]],
+  card: [[523, 0, 0.15], [659, 0.12, 0.15], [784, 0.24, 0.15], [1047, 0.36, 0.4]],
+};
 
 const socket = io();
 const fields = BOARD.fields;
@@ -16,12 +23,48 @@ const cardPlayerEl = document.getElementById("card-player");
 const startBtn = document.getElementById("start-btn");
 const skipBtn = document.getElementById("skip-btn");
 const resetBtn = document.getElementById("reset-btn");
+const soundBtn = document.getElementById("sound-btn");
 
 const fieldEls = [];
 const pieces = {}; // player id -> { el, shown, slot, timer }
 let state = null;
 let seenRollSeq = 0;
 let animatedRollSeq = 0;
+let walkEndsAt = 0;
+let cardKey = null;
+let cardTimer = null;
+let audio = null;
+let muted = loadMuted();
+
+function loadMuted() {
+  try {
+    return localStorage.getItem(MUTE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function playSound(name) {
+  if (!audio || muted) return;
+  for (const [frequency, start, length] of SOUNDS[name]) {
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+    const begin = audio.currentTime + start;
+    oscillator.type = "triangle";
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.25, begin);
+    gain.gain.exponentialRampToValueAtTime(0.001, begin + length);
+    oscillator.connect(gain).connect(audio.destination);
+    oscillator.start(begin);
+    oscillator.stop(begin + length);
+  }
+}
+
+// The fields show the drink everyone has chosen, and beer when the choices are mixed.
+function boardIcon() {
+  const drinks = new Set(state.players.map((p) => p.drink));
+  return drinks.size === 1 ? DRINK_ICONS[[...drinks][0]] : DRINK_ICONS.alkohol;
+}
 
 function sipsText(count) {
   return count === 1 ? "1 tår" : `${count} tårer`;
@@ -104,7 +147,7 @@ function renderOwners() {
     if (fields[index].type !== "bar") return;
     const rent = state.rents[index] ?? fields[index].sips;
     const sipsEl = el.querySelector(".sips");
-    sipsEl.textContent = `🍺 ${sipsText(rent)}`;
+    sipsEl.textContent = `${boardIcon()} ${sipsText(rent)}`;
     sipsEl.classList.toggle("doubled", rent !== fields[index].sips);
   });
 }
@@ -135,6 +178,7 @@ function renderPieces() {
     piece.slot = slot;
     piece.el.classList.toggle("active", player.id === state.current_player_id);
     if (newRoll && newRoll.player_id === player.id) {
+      walkEndsAt = Date.now() + newRoll.value * STEP_MS + 300;
       piece.shown = newRoll.from;
       walkTo(piece, player.position);
     } else if (piece.shown !== player.position) {
@@ -178,6 +222,7 @@ function renderCenter() {
   rollTextEl.textContent = [state.message, pendingText()].filter(Boolean).join("\n");
   if (roll && roll.seq !== animatedRollSeq) {
     animatedRollSeq = roll.seq;
+    playSound("roll");
     diceEl.classList.remove("rolled");
     void diceEl.offsetWidth; // restart the animation
     diceEl.classList.add("rolled");
@@ -187,12 +232,21 @@ function renderCenter() {
 function renderCard() {
   const pending = state.pending;
   const showing = Boolean(pending && pending.type === "card");
-  cardEl.hidden = !showing;
+  const key = showing ? `${state.last_roll.seq}:${pending.text}` : null;
+  if (key === cardKey) return;
+  cardKey = key;
+  clearTimeout(cardTimer);
+  cardEl.hidden = true;
   if (!showing) return;
   const player = state.players.find((p) => p.id === pending.player_id);
   cardTextEl.textContent = pending.text;
   cardPlayerEl.textContent = `${player.name} trykker Færdig på telefonen`;
   cardEl.style.setProperty("--owner", player.color);
+  // The card waits until the piece has walked onto the chance field.
+  cardTimer = setTimeout(() => {
+    cardEl.hidden = false;
+    playSound("card");
+  }, Math.max(0, walkEndsAt - Date.now()));
 }
 
 function renderPlayers() {
@@ -214,7 +268,7 @@ function renderPlayers() {
     else if (player.skip_next) note.textContent = "🥴 Står over";
     const sips = document.createElement("span");
     sips.className = "player-sips";
-    sips.textContent = `🍺 ${player.sips}`;
+    sips.textContent = `${DRINK_ICONS[player.drink]} ${player.sips}`;
     const header = document.createElement("div");
     header.className = "player-header";
     header.append(dot, name, note, sips);
@@ -260,6 +314,26 @@ resetBtn.addEventListener("click", () => {
     hostAction("reset");
   }
 });
+
+function renderSoundButton() {
+  soundBtn.textContent = muted ? "🔇" : "🔊";
+}
+
+soundBtn.addEventListener("click", () => {
+  muted = !muted;
+  try {
+    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+  } catch {}
+  renderSoundButton();
+});
+
+// Browsers only allow sound after a click, so it is switched on by the first one.
+document.addEventListener("click", () => {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!audio && AudioContext) audio = new AudioContext();
+});
+
+renderSoundButton();
 
 window.addEventListener("resize", () => Object.values(pieces).forEach(placePiece));
 
