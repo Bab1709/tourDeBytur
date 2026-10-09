@@ -109,40 +109,44 @@ def on_rejoin(data):
     return {"ok": True, "id": player.id}
 
 
+def run_action(action, *args):
+    with lock:
+        try:
+            action(*args)
+        except GameError as error:
+            return {"ok": False, "error": str(error)}
+    broadcast_state()
+    return {"ok": True}
+
+
 @socketio.on("roll")
 def on_roll(data):
-    with lock:
-        try:
-            game.roll((data or {}).get("token"))
-        except GameError as error:
-            return {"ok": False, "error": str(error)}
-    broadcast_state()
-    return {"ok": True}
+    return run_action(game.roll, (data or {}).get("token"))
 
 
-def host_action(action):
-    with lock:
-        try:
-            action()
-        except GameError as error:
-            return {"ok": False, "error": str(error)}
-    broadcast_state()
-    return {"ok": True}
+@socketio.on("buy")
+def on_buy(data):
+    return run_action(game.buy, (data or {}).get("token"))
+
+
+@socketio.on("decline")
+def on_decline(data):
+    return run_action(game.decline, (data or {}).get("token"))
 
 
 @socketio.on("start")
 def on_start():
-    return host_action(game.start)
+    return run_action(game.start)
 
 
 @socketio.on("skip")
 def on_skip():
-    return host_action(game.skip_turn)
+    return run_action(game.skip_turn)
 
 
 @socketio.on("reset")
 def on_reset():
-    return host_action(game.reset)
+    return run_action(game.reset)
 
 
 if __name__ == "__main__":
