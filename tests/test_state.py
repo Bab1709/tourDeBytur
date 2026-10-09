@@ -254,6 +254,143 @@ def test_reset_clears_owners_and_sips(board):
     assert anna.sips == 0
 
 
+def test_landing_on_another_players_bar_costs_its_sips(board):
+    game, anna, bo = two_player_game(board, 4, 4)
+    game.roll(anna.token)
+    game.buy(anna.token)
+
+    game.roll(bo.token)
+
+    assert bo.sips == 1
+    assert "Bo drikker 1 tår hos Anna" in game.message
+
+
+def test_landing_on_your_own_bar_is_free(board):
+    game = make_game(board, 4, 6)
+    anna = game.add_player("Anna")
+    game.start()
+    game.roll(anna.token)
+    game.buy(anna.token)
+    anna.position = 22
+
+    game.roll(anna.token)
+
+    assert anna.position == 4
+    assert anna.sips == 2  # only the price of the bar
+    assert game.pending is None
+
+
+def test_owning_the_whole_group_doubles_the_sips(board):
+    game, anna, bo = two_player_game(board, 4)
+    game.owners = {4: anna.id}
+    assert game.rent(4) == 1
+    game.owners = {4: anna.id, 5: bo.id}
+    assert game.rent(4) == 1
+    game.owners = {4: anna.id, 5: anna.id}
+    assert game.rent(4) == 2
+    assert game.to_dict()["rents"] == {"4": 2, "5": 2}
+    game.turn = 1
+
+    game.roll(bo.token)
+
+    assert bo.sips == 2
+    assert "hele farvegruppen" in game.message
+
+
+def test_passing_start_lets_you_give_sips_to_another_player(board):
+    game, anna, bo = two_player_game(board, 5)
+    anna.position = 22
+
+    game.roll(anna.token)
+
+    assert game.pending == {"type": "give", "player_id": anna.id, "sips": 2}
+    assert game.current_player is anna
+
+    game.give(anna.token, bo.id)
+
+    assert bo.sips == 2
+    assert anna.sips == 0
+    assert game.pending is None
+    assert game.current_player is bo
+
+
+def test_sips_cannot_be_given_to_yourself_or_nobody(board):
+    game, anna, bo = two_player_game(board, 5)
+    anna.position = 22
+    game.roll(anna.token)
+    with pytest.raises(GameError):
+        game.give(anna.token, anna.id)
+    with pytest.raises(GameError):
+        game.give(anna.token, 999)
+    with pytest.raises(GameError):
+        game.give(bo.token, anna.id)
+    assert game.pending["type"] == "give"
+
+
+def test_passing_start_onto_a_free_bar_asks_both_questions(board):
+    game, anna, bo = two_player_game(board, 6)
+    anna.position = 22
+
+    game.roll(anna.token)
+    assert game.pending["type"] == "give"
+    with pytest.raises(GameError):
+        game.buy(anna.token)
+    game.give(anna.token, bo.id)
+
+    assert game.pending == {"type": "buy", "player_id": anna.id, "field": 4, "price": 2}
+    game.buy(anna.token)
+    assert game.owners == {4: anna.id}
+    assert game.current_player is bo
+
+
+def test_landing_exactly_on_start_counts_as_passing(board):
+    game, anna, bo = two_player_game(board, 2)
+    anna.position = 22
+    game.roll(anna.token)
+    assert game.pending["type"] == "give"
+
+
+def test_brandert_corner_skips_the_players_next_turn(board):
+    game, anna, bo = two_player_game(board, 6, 3, 3)
+    anna.position = 6
+
+    game.roll(anna.token)
+
+    assert anna.position == 12
+    assert anna.skip_next is True
+    assert "glas vand" in game.message
+
+    game.roll(bo.token)  # Anna sits out, so it is Bo again
+
+    assert game.current_player is bo
+    assert anna.skip_next is False
+    game.roll(bo.token)
+    assert game.current_player is anna
+
+
+def test_brandert_corner_alone_does_not_lock_the_game(board):
+    game = make_game(board, 6, 3)
+    anna = game.add_player("Anna")
+    game.start()
+    anna.position = 6
+    game.roll(anna.token)
+    assert game.current_player is anna
+    game.roll(anna.token)
+    assert anna.position == 15
+
+
+def test_skip_turn_drops_all_waiting_choices(board):
+    game, anna, bo = two_player_game(board, 6)
+    anna.position = 22
+    game.roll(anna.token)
+
+    game.skip_turn()
+
+    assert game.pending is None
+    assert game.current_player is bo
+    assert bo.sips == 0
+
+
 def test_state_never_contains_tokens(board):
     game = make_game(board)
     anna = game.add_player("Anna")

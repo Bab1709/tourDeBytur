@@ -21,7 +21,7 @@ socketio = SocketIO(app, async_mode="threading")
 
 board = load_board(DATA_DIR / "board.json")
 settings = json.loads((DATA_DIR / "settings.json").read_text(encoding="utf-8"))
-game = Game(board, dice_sides=settings["dice_sides"], max_players=settings["max_players"])
+game = Game(board, **settings)
 lock = threading.Lock()
 connections = {}  # socket id -> player token
 
@@ -132,6 +132,11 @@ def on_buy(data):
 @socketio.on("decline")
 def on_decline(data):
     return run_action(game.decline, (data or {}).get("token"))
+
+
+@socketio.on("give")
+def on_give(data):
+    return run_action(game.give, (data or {}).get("token"), (data or {}).get("target"))
 
 
 @socketio.on("start")

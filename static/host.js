@@ -74,7 +74,7 @@ function placePiece(piece) {
   const field = fieldEls[piece.shown];
   const size = field.offsetWidth * 0.26;
   const x = field.offsetLeft + field.offsetWidth * (0.17 + 0.22 * (piece.slot % 4));
-  const y = field.offsetTop + field.offsetHeight * (piece.slot < 4 ? 0.6 : 0.84);
+  const y = field.offsetTop + field.offsetHeight * (piece.slot < 4 ? 0.66 : 0.86);
   piece.el.style.width = piece.el.style.height = `${size}px`;
   piece.el.style.fontSize = `${size * 0.55}px`;
   piece.el.style.transform = `translate(${x - size / 2}px, ${y - size / 2}px)`;
@@ -98,6 +98,11 @@ function renderOwners() {
     const color = colors[state.owners[index]];
     el.classList.toggle("owned", Boolean(color));
     el.style.setProperty("--owner", color || "transparent");
+    if (fields[index].type !== "bar") return;
+    const rent = state.rents[index] ?? fields[index].sips;
+    const sipsEl = el.querySelector(".sips");
+    sipsEl.textContent = `🍺 ${sipsText(rent)}`;
+    sipsEl.classList.toggle("doubled", rent !== fields[index].sips);
   });
 }
 
@@ -137,6 +142,17 @@ function renderPieces() {
   });
 }
 
+// Tells the room what the game is waiting for while a player chooses on their phone.
+function pendingText() {
+  const pending = state.pending;
+  if (!pending) return "";
+  const name = state.players.find((p) => p.id === pending.player_id).name;
+  if (pending.type === "buy") {
+    return `${name} kan købe ${fields[pending.field].name} for ${sipsText(pending.price)}…`;
+  }
+  return `${name} passerede start og vælger, hvem der skal have ${sipsText(pending.sips)}…`;
+}
+
 function renderCenter() {
   const current = state.players.find((p) => p.id === state.current_player_id);
   if (!state.started) {
@@ -156,7 +172,7 @@ function renderCenter() {
   } else {
     diceEl.textContent = "🎲";
   }
-  rollTextEl.textContent = state.message;
+  rollTextEl.textContent = [state.message, pendingText()].filter(Boolean).join("\n");
   if (roll && roll.seq !== animatedRollSeq) {
     animatedRollSeq = roll.seq;
     diceEl.classList.remove("rolled");
@@ -178,15 +194,34 @@ function renderPlayers() {
     const name = document.createElement("span");
     name.className = "player-name";
     name.textContent = player.name;
-    const where = document.createElement("span");
-    where.className = "player-where";
-    where.textContent = player.connected ? fields[player.position].name : "Ikke forbundet";
-    li.append(dot, name, where);
+    const note = document.createElement("span");
+    note.className = "player-note";
+    if (!player.connected) note.textContent = "Ikke forbundet";
+    else if (player.skip_next) note.textContent = "🥴 Står over";
+    const sips = document.createElement("span");
+    sips.className = "player-sips";
+    sips.textContent = `🍺 ${player.sips}`;
+    const header = document.createElement("div");
+    header.className = "player-header";
+    header.append(dot, name, note, sips);
+
+    const bars = document.createElement("div");
+    bars.className = "player-bars";
+    fields.forEach((field, index) => {
+      if (state.owners[index] !== player.id) return;
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = field.name;
+      chip.style.background = BOARD.groups[field.group].color;
+      bars.append(chip);
+    });
+    li.append(header, bars);
     playersEl.append(li);
   }
 }
 
 function render() {
+  document.body.classList.toggle("started", state.started);
   renderOwners();
   renderPieces();
   renderCenter();
