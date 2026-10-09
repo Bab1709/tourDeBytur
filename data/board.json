@@ -1,0 +1,38 @@
+{
+  "groups": {
+    "brun": { "name": "Bodegaerne", "color": "#a16207" },
+    "lyseblaa": { "name": "Studiebarerne", "color": "#38bdf8" },
+    "pink": { "name": "Cocktailbarerne", "color": "#ec4899" },
+    "orange": { "name": "Ølbarerne", "color": "#f97316" },
+    "roed": { "name": "Sportsbarerne", "color": "#ef4444" },
+    "gul": { "name": "Karaokebarerne", "color": "#eab308" },
+    "groen": { "name": "Natklubberne", "color": "#22c55e" },
+    "lilla": { "name": "De fine steder", "color": "#8b5cf6" }
+  },
+  "fields": [
+    { "type": "start", "name": "Start" },
+    { "type": "bar", "name": "Den Brune Bodega", "group": "brun", "price": 1, "sips": 1 },
+    { "type": "bar", "name": "Hjørnets Værtshus", "group": "brun", "price": 1, "sips": 1 },
+    { "type": "chance", "name": "Chance" },
+    { "type": "bar", "name": "Fredagsbaren", "group": "lyseblaa", "price": 2, "sips": 1 },
+    { "type": "bar", "name": "Kollegiebaren", "group": "lyseblaa", "price": 2, "sips": 1 },
+    { "type": "chance", "name": "Chance" },
+    { "type": "bar", "name": "Den Lyserøde Flamingo", "group": "pink", "price": 2, "sips": 2 },
+    { "type": "bar", "name": "Mojito Minna", "group": "pink", "price": 2, "sips": 2 },
+    { "type": "chance", "name": "Chance" },
+    { "type": "bar", "name": "Humlehulen", "group": "orange", "price": 3, "sips": 2 },
+    { "type": "bar", "name": "Fadølsfabrikken", "group": "orange", "price": 3, "sips": 2 },
+    { "type": "brandert", "name": "Brandert-hjørnet" },
+    { "type": "bar", "name": "Offside", "group": "roed", "price": 3, "sips": 3 },
+    { "type": "bar", "name": "Tredje Halvleg", "group": "roed", "price": 3, "sips": 3 },
+    { "type": "chance", "name": "Chance" },
+    { "type": "bar", "name": "Falske Toner", "group": "gul", "price": 4, "sips": 3 },
+    { "type": "bar", "name": "Mikrofonen", "group": "gul", "price": 4, "sips": 3 },
+    { "type": "chance", "name": "Chance" },
+    { "type": "bar", "name": "Klub Kaos", "group": "groen", "price": 4, "sips": 4 },
+    { "type": "bar", "name": "Dansegulvet", "group": "groen", "price": 4, "sips": 4 },
+    { "type": "chance", "name": "Chance" },
+    { "type": "bar", "name": "Champagnebaren", "group": "lilla", "price": 5, "sips": 5 },
+    { "type": "bar", "name": "Tagterrassen", "group": "lilla", "price": 5, "sips": 5 }
+  ]
+}
