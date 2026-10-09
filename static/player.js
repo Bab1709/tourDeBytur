@@ -1,4 +1,10 @@
 const TOKEN_KEY = "tourDeByturToken";
+const DRINKS = [
+  ["alkohol", "🍺", "Alkohol"],
+  ["sodavand", "🥤", "Sodavand"],
+  ["vand", "💧", "Vand"],
+];
+const DRINK_ICONS = Object.fromEntries(DRINKS.map(([id, icon]) => [id, icon]));
 
 const socket = io();
 const joinView = document.getElementById("join-view");
@@ -16,10 +22,13 @@ const cardText = document.getElementById("card-text");
 const doneBtn = document.getElementById("done-btn");
 const resultEl = document.getElementById("result");
 const errorEl = document.getElementById("error");
+const joinDrinks = document.getElementById("join-drinks");
+const gameDrinks = document.getElementById("game-drinks");
 
 let token = loadToken();
 let myId = null;
 let state = null;
+let joinDrink = document.body.dataset.defaultDrink;
 let busy = false; // waiting for the server to answer a button press
 
 // Storage can be blocked in private browsing; the game still works without it.
@@ -39,7 +48,26 @@ function saveToken(value) {
   } catch {}
 }
 
+function buildDrinkPicker(container, onPick) {
+  for (const [id, icon, label] of DRINKS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-drink";
+    button.dataset.drink = id;
+    button.textContent = `${icon} ${label}`;
+    button.addEventListener("click", () => onPick(id));
+    container.append(button);
+  }
+}
+
+function markDrink(container, selected) {
+  for (const button of container.children) {
+    button.classList.toggle("selected", button.dataset.drink === selected);
+  }
+}
+
 function render() {
+  markDrink(joinDrinks, joinDrink);
   if (!state) return;
   const me = state.players.find((p) => p.id === myId);
   joinView.hidden = Boolean(me);
@@ -47,7 +75,8 @@ function render() {
   if (!me) return;
 
   document.body.style.setProperty("--me", me.color);
-  meEl.textContent = `${me.name} · 🍺 ${me.sips}`;
+  meEl.textContent = `${me.name} · ${DRINK_ICONS[me.drink]} ${me.sips}`;
+  markDrink(gameDrinks, me.drink);
 
   const current = state.players.find((p) => p.id === state.current_player_id);
   const myTurn = state.started && current.id === myId;
@@ -112,7 +141,7 @@ function send(event, extra = {}) {
 joinView.addEventListener("submit", (event) => {
   event.preventDefault();
   errorEl.textContent = "";
-  socket.emit("join", { name: nameInput.value }, (result) => {
+  socket.emit("join", { name: nameInput.value, drink: joinDrink }, (result) => {
     if (!result.ok) {
       errorEl.textContent = result.error;
       return;
@@ -122,6 +151,13 @@ joinView.addEventListener("submit", (event) => {
     render();
   });
 });
+
+buildDrinkPicker(joinDrinks, (drink) => {
+  joinDrink = drink;
+  render();
+});
+buildDrinkPicker(gameDrinks, (drink) => send("set_drink", { drink }));
+render();
 
 rollBtn.addEventListener("click", () => send("roll"));
 buyBtn.addEventListener("click", () => send("buy"));

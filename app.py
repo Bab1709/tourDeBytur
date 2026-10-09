@@ -58,7 +58,7 @@ def host():
 
 @app.route("/play")
 def play():
-    return render_template("player.html")
+    return render_template("player.html", default_drink=game.default_drink)
 
 
 @app.route("/qr.svg")
@@ -89,7 +89,7 @@ def on_disconnect():
 def on_join(data):
     with lock:
         try:
-            player = game.add_player((data or {}).get("name", ""))
+            player = game.add_player((data or {}).get("name", ""), (data or {}).get("drink"))
         except GameError as error:
             return {"ok": False, "error": str(error)}
         connections[request.sid] = player.token
@@ -143,6 +143,11 @@ def on_give(data):
 @socketio.on("finish_card")
 def on_finish_card(data):
     return run_action(game.finish_card, (data or {}).get("token"))
+
+
+@socketio.on("set_drink")
+def on_set_drink(data):
+    return run_action(game.set_drink, (data or {}).get("token"), (data or {}).get("drink"))
 
 
 @socketio.on("start")

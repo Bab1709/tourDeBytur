@@ -6,13 +6,15 @@
   <title>Tour de Bytur</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="phone">
+<body class="phone" data-default-drink="{{ default_drink }}">
   <main class="phone-main">
     <h1>Tour de <span>Bytur</span></h1>
 
     <form id="join-view" class="view" hidden>
       <label for="name">Hvad hedder du?</label>
       <input id="name" type="text" maxlength="14" autocomplete="off" placeholder="Dit navn">
+      <label>Hvad drikker du?</label>
+      <div id="join-drinks" class="drink-picker"></div>
       <button class="btn btn-primary btn-big" type="submit">Join</button>
     </form>
 
@@ -30,6 +32,7 @@
         <button id="done-btn" class="btn btn-choice btn-buy">Færdig ✔</button>
       </div>
       <p id="result" class="result"></p>
+      <div id="game-drinks" class="drink-picker drink-picker-small"></div>
     </section>
 
     <p id="error" class="error"></p>

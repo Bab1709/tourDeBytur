@@ -469,6 +469,39 @@ def test_chance_does_nothing_without_cards(board):
     assert game.current_player is bo
 
 
+def test_players_drink_alcohol_unless_they_choose_otherwise(board):
+    game = make_game(board)
+    assert game.add_player("Anna").drink == "alkohol"
+    assert game.add_player("Bo", "vand").drink == "vand"
+    assert game.to_dict()["players"][1]["drink"] == "vand"
+
+
+def test_default_drink_can_be_changed_in_settings(board):
+    game = Game(board, default_drink="sodavand")
+    assert game.add_player("Anna").drink == "sodavand"
+    with pytest.raises(ValueError):
+        Game(board, default_drink="kaffe")
+
+
+def test_unknown_drink_is_refused(board):
+    game = make_game(board)
+    with pytest.raises(GameError):
+        game.add_player("Anna", "kaffe")
+    assert game.players == []
+
+
+def test_a_player_can_switch_drink_during_the_game(board):
+    game, anna, bo = two_player_game(board)
+    game.set_drink(anna.token, "sodavand")
+    assert anna.drink == "sodavand"
+    with pytest.raises(GameError):
+        game.set_drink(anna.token, "kaffe")
+    with pytest.raises(GameError):
+        game.set_drink("forkert", "vand")
+    game.reset()
+    assert anna.drink == "sodavand"
+
+
 def test_state_never_contains_tokens(board):
     game = make_game(board)
     anna = game.add_player("Anna")
